@@ -1,15 +1,9 @@
 ---
-title: API Reference
+title: OVI API Reference
 
 language_tabs: # must be one of https://git.io/vQNgJ
   - shell
-  - ruby
-  - python
-  - javascript
-
-toc_footers:
-  - <a href='#'>Sign Up for a Developer Key</a>
-  - <a href='https://github.com/tripit/slate'>Documentation Powered by Slate</a>
+  - java
 
 includes:
   - errors
@@ -19,221 +13,390 @@ search: true
 
 # Introduction
 
-Welcome to the Kittn API! You can use our API to access Kittn API endpoints, which can get information on various cats, kittens, and breeds in our database.
-
-We have language bindings in Shell, Ruby, and Python! You can view code examples in the dark area to the right, and you can switch the programming language of the examples with the tabs in the top right.
-
-This example API documentation page was created with [Slate](https://github.com/tripit/slate). Feel free to edit it and use it as a base for your own API's documentation.
+This document describes in detail the API between OVI and OVM. This document is intended for GTK developers only. In case this API document needs to be updated, please commit changes to the ovi-ovm-api repository in bitbucket.
 
 # Authentication
 
-> To authorize, use this code:
+In order to access the OVI API, the IP address of the calling system has to be cleared through OVI's firewall.
 
-```ruby
-require 'kittn'
+There are two places where the IP needs to be added in order to allow it through.
 
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-```
-
-```shell
-# With shell, you can just pass the correct header with each request
-curl "api_endpoint_here"
-  -H "Authorization: meowmeowmeow"
-```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-```
-
-> Make sure to replace `meowmeowmeow` with your API key.
-
-Kittn uses API keys to allow access to the API. You can register a new Kittn API key at our [developer portal](http://example.com/developers).
-
-Kittn expects for the API key to be included in all API requests to the server in a header that looks like the following:
-
-`Authorization: meowmeowmeow`
+`External IP allowed to use PMSi service. Use comma ( , ) to seperate the IPs.`
+And
+`servletConfig.allowedIp`
 
 <aside class="notice">
-You must replace <code>meowmeowmeow</code> with your personal API key.
+These configurations are under: <br>
+- Synapse > PMSi > Global Configurations
+<br>
+- OVI Console > Applications > Servlets
 </aside>
 
-# Kittens
+# Configuration set
+Timeouts
 
-## Get All Kittens
+# OVMRequest
 
-```ruby
-require 'kittn'
+Simple servlet in OVI which is called by OVM to perform various actions. <br>
+`End point reachable at https://ovi_ip/api/pmsi/OVMRequest`
+<aside class="notice">
+Accepts XML. Responds in XML
+</aside>
 
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.get
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.get()
-```
+## post
 
 ```shell
-curl "http://example.com/api/kittens"
-  -H "Authorization: meowmeowmeow"
+curl -X POST -d \
+"<?xml version='1.0' encoding='UTF-8'?> \
+<post> \
+<room>101</room> \
+<amount>1295</amount> \
+<description>MOVIE</description> \
+<detailDescription>MOVIE-12911</detailDescription> \
+</post>" \
+http://darekovi.rndguest.tk/api/pmsi/OVMRequest
 ```
 
-```javascript
+```java
 const kittn = require('kittn');
 
 let api = kittn.authorize('meowmeowmeow');
 let kittens = api.kittens.get();
 ```
 
-> The above command returns JSON structured like this:
+> The above command should return XML:
 
-```json
-[
-  {
-    "id": 1,
-    "name": "Fluffums",
-    "breed": "calico",
-    "fluffiness": 6,
-    "cuteness": 7
-  },
-  {
-    "id": 2,
-    "name": "Max",
-    "breed": "unknown",
-    "fluffiness": 5,
-    "cuteness": 10
-  }
-]
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<postReply>
+    <description></description>
+    <result>true</result>
+    <status>no_error</status>
+</postReply>
 ```
 
-This endpoint retrieves all kittens.
+This call will post charges to the room.
 
-### HTTP Request
+### Expected XML Parameters
 
-`GET http://example.com/api/kittens`
+Parameter | Example |Description
+--------- | ------- |-----------
+room | 110 |room number where the charge should go to
+amount| 1095 |Amount in cents how much the charge should be
+description | MOVIE | PMS code to what the charge is for
+detailDescription | MOVIE-1234 | additional information
 
-### Query Parameters
+### Return XML Paramters
+parameter name | values | description
+-------------- | ------ | -----------
+description | String | hardcoded as ""
+result | true/false | Did this request go through successfully?
+status | String | short description of the result
 
-Parameter | Default | Description
---------- | ------- | -----------
-include_cats | false | If set to true, the result will also include cats.
-available | true | If set to false, the result will include kittens that have already been adopted.
+### Possible STATUS Response
 
-<aside class="success">
-Remember — a happy kitten is an authenticated kitten!
+result | status |reason
+------ | ------ |------
+true | no_error | posting went through successfully
+false| unknown_room | This room does not exist in OVI
+false| vacant_room | Room vacant
+false| express_checkout_not_permitted | Room is inhibited
+false| unsupported_message | Incorrect internal request format
+false| unsupported_feature | PMSi not configured
+false| invalid_account | Invalid account number
+false| PMS_error | No response from the PMS
+false| unknown_error | PMS response was unknown to OVI
+
+
+## roomStatusRequest
+
+Method to request the current status of the room in OVI.
+
+```shell
+curl -X POST -d "<?xml version='1.0' encoding='UTF-8'?> \
+<roomStatusRequest> \
+<room>101</room> \
+</roomStatusRequest>" http://darekovi.rndguest.tk/api/pmsi/OVMRequest
+```
+
+```java
+const kittn = require('kittn');
+
+let api = kittn.authorize('meowmeowmeow');
+let kittens = api.kittens.get();
+```
+
+> Example of the XML response for the above command:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<roomStatus>
+    <checkin>true</checkin>
+    <guest>
+        <accountNumber>101</accountNumber>
+        <checkinDate>2017-10-16</checkinDate>
+        <checkoutDate>2017-10-16</checkoutDate>
+        <country></country>
+        <firstName></firstName>
+        <fullName>Plum</fullName>
+        <groupNumber></groupNumber>
+        <guestInhibit>false</guestInhibit>
+        <lastName>Plum</lastName>
+        <messageWaiting>none</messageWaiting>
+        <oldRoom></oldRoom>
+        <paymentMethod>unknown</paymentMethod>
+        <primary>false</primary>
+        <rateCodeMap/>
+        <sharedRoom>false</sharedRoom>
+        <title></title>
+        <vip>false</vip>
+    </guest>
+    <inhibit>false</inhibit>
+    <resync>false</resync>
+    <room>101</room>
+</roomStatus>
+
+```
+
+### Expected XML parameters
+
+Parameter | Example |Description
+--------- | ------- |-----------
+room | 110 |Requested room
+
+### Return Response
+These responses correspond to the result XML message.
+Possible responses from this endpoint:
+
+parameter name | values | description
+-------------- | ------ | -----------
+checkin | true/false | Guest is checked in or not
+guest | GuestInfo | GuestInfo object. See below for details
+inhibit | true/false | Are charges allowed to this room
+resync | true/false | Is OVI in resyc state?
+room | String | Associated room name
+
+### GuestInfo object parameters
+parameter name | values | description
+-------------- | ------ | -----------
+accountNumber | String | Guest PMS account number
+checkinDate| Date | Guest's checkin date (YYYY-MM-DD)
+checkoutDate | Date | Guest's checkout date(YYYY-MM-DD)
+country | String | Country of origin
+firstName | String | Guest's first name
+fullName | String | Guest's unparsed full name
+groupNumber | String |?
+guestInhibit | boolean | Are charges allowed for this guest
+lastName | String | Guest's last name
+messageWaiting | none/undelivered/alldelivered | Any messages for the guest
+oldRoom | String | Guest's old room
+paymentMethod | cash/creditCard/unkown | Guest's payement type
+primary | boolean | Is this guest the primary account holder
+rateCodeMap | Array<String> | ratecodes associated with this guest
+sharedRoom | boolean | Is this room shared with another guest
+title | String | Guest's title
+vip | boolean | Is this guest considered a vip
+
+
+## folioRequest
+
+```shell
+curl -X POST -d "<?xml version='1.0' encoding='UTF-8'?> \
+<folio> \
+<room>102</room> \
+<account>102</account> \
+</folio>" http://darekovi.rndguest.tk/api/pmsi/OVMRequest
+```
+> The example return XML:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<folioReply>
+    <balance>0</balance>
+    <item>
+        <amount>1000</amount>
+        <date>2017-10-16-06:00</date>
+        <description>STANDARD INTERNET</description>
+    </item>
+    <item>
+        <amount>995</amount>
+        <date>2017-10-16-06:30</date>
+        <description>MOVIE-1234</description>
+    </item>
+    <result>true</result>
+    <status>no_error</status>
+</folioReply>
+```
+
+### Expected XML Parameters
+
+Parameter | Example |Description
+--------- | ------- |-----------
+room | 110 |room number for the folio request
+account| 110 |account number for the folio request
+
+### Return XML Paramters
+parameter name | values | description
+-------------- | ------ | -----------
+balance | integer | total folio balance. Default -1 if no balance available
+result | true/false | Did this request go through successfully?
+item | Array<FolioItem> | List of FolioItem objects. See below for details
+status | String | possible status responses. See below for details
+description | String | short description for this response
+
+### FolioItem object parameters
+parameter name | values | description
+-------------- | ------ | -----------
+amount | integer | Charge amount
+description | String | Folio description of the item
+date | Date | Charge date (YYYY-MM-DD-HH:MM)
+location | String | Optional.
+
+### Possible STATUS Response
+
+result | status |reason
+------ | ------ |------
+true | no_error | posting went through successfully
+false| unknown_room | This room does not exist in OVI
+false| vacant_room | Room vacant
+false| express_checkout_not_permitted | Room is inhibited
+false| unsupported_message | Incorrect internal request format
+false| unsupported_feature | PMSi not configured
+false| invalid_account | Invalid account number
+false| PMS_error | No response from the PMS
+false| unknown_error | PMS response was unknown to OVI
+
+## expressCheckout
+
+```shell
+url -X POST -d "<?xml version='1.0' encoding='UTF-8'?> \
+<expressCheckout> \
+<room>100</room> \
+<account>100</account> \
+<balance>1000</balance> \
+</expressCheckout>" http://darekovi.rndguest.tk/api/pmsi/OVMRequest
+```
+> The above command returns example XML:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<expressCheckoutReply>
+    <description></description>
+    <result>true</result>
+    <status>no_error</status>
+</expressCheckoutReply>
+```
+
+### Expected XML Parameters
+
+Parameter | Example |Description
+--------- | ------- |-----------
+room | 110 |room number for the folio request
+account| 110 |account number for the folio request
+balance | 1295 |Total balance of the folio. Has to match the current folio balance for this room.
+
+### Return XML Paramters
+parameter name | values | description
+-------------- | ------ | -----------
+description | String | Description from PMS
+result | boolean | Did this request go through successfully?
+status | String | short description of the result
+
+### Possible STATUS Response
+
+result | status |reason
+------ | ------ |------
+true | no_error | posting went through successfully
+false| unknown_room | This room does not exist in OVI
+false| vacant_room | Room vacant
+false| express_checkout_not_permitted | Room is inhibited
+false| unsupported_message | Incorrect internal request format
+false| unsupported_feature | PMSi not configured
+false| invalid_account | Invalid account number
+false| PMS_error | No response from the PMS or balance mismatch
+false| unknown_error | PMS response was unknown to OVI
+
+# OVMAPI
+
+Endpoint in OVI which is called by OVM to get or delete messages which are stored in the PMS from the front desk.
+These messages are displayed on TVs for hotel guests.
+
+`End point reachable at https://ovi_ip/api/pmsi/OVMAPI`
+<aside class="notice">
+Accepts JSON. Responds in JSON
 </aside>
 
-## Get a Specific Kitten
+<aside class="success">
+Only supported by `FIAS` interface
+</aside>
 
-```ruby
-require 'kittn'
+## retrieveMessagesRequest
 
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.get(2)
-```
+A way of retrieving messages which are stored in the PMS for the guest. These can be entered by the front desk.
 
-```python
-import kittn
+### Expected JSON Parameters
 
-api = kittn.authorize('meowmeowmeow')
-api.kittens.get(2)
-```
+Parameter | Example |Description
+--------- | ------- |-----------
+room | 110 |room number for the folio request
+accountId| 110 |account number for the folio request
+
+### Return XML Paramters
+
+TBD
 
 ```shell
-curl "http://example.com/api/kittens/2"
-  -H "Authorization: meowmeowmeow"
+curl -X POST -d "{ \
+\"roomNumber\": \"101\",\
+\"accountId\": \"101\"\
+}" http://darekovi.rndguest.tk/api/pmsi/OVMAPI
 ```
 
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let max = api.kittens.get(2);
-```
-
-> The above command returns JSON structured like this:
+> Should return this json
 
 ```json
 {
-  "id": 2,
-  "name": "Max",
-  "breed": "unknown",
-  "fluffiness": 5,
-  "cuteness": 10
+    "messages" : [""]
 }
 ```
+## deleteMessageRequest
 
-This endpoint retrieves a specific kitten.
+A way of deleting messages which are stored in the PMS
 
-<aside class="warning">Inside HTML code blocks like this one, you can't use Markdown, so use <code>&lt;code&gt;</code> blocks to denote code.</aside>
+### Expected JSON Parameters
 
-### HTTP Request
+Parameter | Example |Description
+--------- | ------- |-----------
+roomNumber | 110 |room number for the folio request
+accountId| 110 |account number for the folio request
+messageId| 001 |id of the message that needs to be removed in the PMS
 
-`GET http://example.com/kittens/<ID>`
+### Expected result
 
-### URL Parameters
+parameter name | values | description
+-------------- | ------ | -----------
+result | boolean | result of the removal
 
-Parameter | Description
---------- | -----------
-ID | The ID of the kitten to retrieve
-
-## Delete a Specific Kitten
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.delete(2)
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.delete(2)
-```
 
 ```shell
-curl "http://example.com/api/kittens/2"
-  -X DELETE
-  -H "Authorization: meowmeowmeow"
+curl -X POST -d "{ \
+\"roomNumber\": \"101\",\
+\"accountId\": \"101\",\
+\"messageId\": \"001\"\
+}" http://darekovi.rndguest.tk/api/pmsi/OVMAPI
 ```
 
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let max = api.kittens.delete(2);
-```
-
-> The above command returns JSON structured like this:
+> Should return this json
 
 ```json
 {
-  "id": 2,
-  "deleted" : ":("
+    "result":true
 }
 ```
 
-This endpoint retrieves a specific kitten.
+# OutGoingMessageController
 
-### HTTP Request
+This endpoint is used for sending messages to OVM.
 
-`DELETE http://example.com/kittens/<ID>`
 
-### URL Parameters
-
-Parameter | Description
---------- | -----------
-ID | The ID of the kitten to delete
 
